@@ -6,12 +6,12 @@ export async function handler(event) {
     'Content-Type': 'application/json',
   };
 
-  // 1. Handle CORS preflight
+  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  // 2. Only allow POST
+  // Only allow POST
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -32,56 +32,53 @@ export async function handler(event) {
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
+
     if (!apiKey) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'Server configuration error: API key missing in Netlify' }),
+        body: JSON.stringify({ error: 'API key missing in Netlify' }),
       };
     }
 
-    /**
-     * UPDATED FOR APRIL 2026:
-     * - Gemini 1.5/2.0 series are largely discontinued.
-     * - Current standard: gemini-3.1-flash-lite-preview (or gemini-3.1-flash-preview)
-     * - Endpoint: v1beta
-     */
-    const MODEL_ID = "gemini-3.1-flash-lite-preview"; 
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
+    // ✅ FINAL WORKING MODEL + ENDPOINT
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [{ text: message }]
-        }],
+        contents: [
+          {
+            parts: [{ text: message }]
+          }
+        ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 512,
         },
       }),
     });
 
-    // 3. Catch API errors (404, 403, 429)
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       console.error(`Gemini API Error (${response.status}):`, errorBody);
-      
-      // We pass the error back to your frontend so you can see why it failed
+
       return {
         statusCode: response.status,
         headers,
         body: JSON.stringify({
           error: `Google API ${response.status}`,
-          message: errorBody.error?.message || "Resource not found or retired.",
-          suggestion: "Check if your API Key is active in Google AI Studio."
+          message: errorBody.error?.message || "API error",
         }),
       };
     }
 
     const data = await response.json();
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response generated.";
 
     return {
       statusCode: 200,
@@ -91,10 +88,14 @@ export async function handler(event) {
 
   } catch (error) {
     console.error('Chat function execution error:', error);
+
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error', message: error.message }),
+      body: JSON.stringify({
+        error: 'Internal server error',
+        message: error.message,
+      }),
     };
   }
 }
