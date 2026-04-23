@@ -49,7 +49,7 @@ export async function handler(event) {
 
     // Call Gemini API
     const response = await fetch(
-  bbb`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
