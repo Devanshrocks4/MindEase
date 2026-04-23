@@ -96,5 +96,6 @@ export async function handler(event) {
         error: 'Internal server error',
       }),
     };
+    
   }
 }
