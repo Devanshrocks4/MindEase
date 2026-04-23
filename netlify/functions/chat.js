@@ -36,17 +36,17 @@ export async function handler(event) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'Server configuration error: API key missing' }),
+        body: JSON.stringify({ error: 'Server configuration error: API key missing in Netlify' }),
       };
     }
 
     /**
      * UPDATED FOR APRIL 2026:
-     * - Gemini 1.5 is SHUT DOWN. 
-     * - We now use Gemini 3 Flash Preview (gemini-3-flash-preview).
-     * - Using the v1beta endpoint for the latest features.
+     * - Gemini 1.5/2.0 series are largely discontinued.
+     * - Current standard: gemini-3.1-flash-lite-preview (or gemini-3.1-flash-preview)
+     * - Endpoint: v1beta
      */
-    const MODEL_ID = "gemini-3-flash-preview";
+    const MODEL_ID = "gemini-3.1-flash-lite-preview"; 
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
 
     const response = await fetch(API_URL, {
@@ -58,23 +58,24 @@ export async function handler(event) {
         }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1024, // Increased for 2026 standards
+          maxOutputTokens: 1024,
         },
       }),
     });
 
-    // 3. Robust Error Handling
+    // 3. Catch API errors (404, 403, 429)
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
       console.error(`Gemini API Error (${response.status}):`, errorBody);
       
+      // We pass the error back to your frontend so you can see why it failed
       return {
         statusCode: response.status,
         headers,
         body: JSON.stringify({
-          error: "Gemini API rejected the request",
-          status: response.status,
-          details: errorBody.error?.message || "Check server logs"
+          error: `Google API ${response.status}`,
+          message: errorBody.error?.message || "Resource not found or retired.",
+          suggestion: "Check if your API Key is active in Google AI Studio."
         }),
       };
     }
