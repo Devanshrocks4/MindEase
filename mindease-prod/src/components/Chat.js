@@ -33,79 +33,109 @@ function detectNeedForHelp(messages) {
   return count >= 2;
 }
 
+// async function callGeminiAPI(messages) {
+//   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+//   if (!apiKey || apiKey.trim() === '') {
+//     throw new Error('NO_KEY');
+//   }
+
+//   const systemPrompt = `You are MindEase AI — a compassionate dual-role mental health companion combining Clinical Psychology and Neurology expertise, built by Devansh Gupta & Team for users in India.
+
+// PERSONA: Warm, empathetic, professionally grounded. Never robotic. Validate emotions first, then offer solutions. Use evidence-based approaches: CBT, mindfulness, psychoeducation. Ask ONE question at a time. Be conversational, not clinical.
+
+// PSYCHOLOGY EXPERTISE: Anxiety, depression, stress, trauma, grief, relationships, self-esteem, OCD, PTSD, panic attacks. Teach: box breathing, grounding (5-4-3-2-1), journaling, cognitive reframing.
+
+// NEUROLOGY EXPERTISE: Sleep disorders, headaches/migraines, brain fog, memory issues, ADHD, poor concentration. Explain brain-body connections. Suggest: sleep hygiene, diet, exercise, screen habits.
+
+// ASSESSMENT: After 4-6 exchanges, if you sense the person needs professional help (persistent symptoms, severe distress, safety concerns), gently recommend a specialist. Specify PSYCHOLOGIST for emotional/mental issues, NEUROLOGIST for brain/sleep/physical symptoms, PSYCHIATRIST for medication needs or severe conditions.
+
+// SAFETY: If self-harm or suicide is mentioned → immediately provide: iCall: 9152987821 | Vandrevala: 1860-2662-345 | NIMHANS: 080-46110007 | Emergency: 112. Urge them to call NOW.
+
+// STYLE: 3-5 sentences unless more is needed. Warm conversational tone. End with a gentle question or empathetic suggestion. Be culturally aware of South Asian mental health stigma — normalize seeking help.
+
+// IMPORTANT: When you identify the person likely needs a specific type of specialist, include this exact marker in your response: [NEEDS_SPECIALIST:psychologist] or [NEEDS_SPECIALIST:neurologist] or [NEEDS_SPECIALIST:psychiatrist] — this will trigger the app to show the right doctor. Only add this marker once, when you are genuinely confident.`;
+
+//   try {
+//     // Convert messages to Gemini format (system as first content)
+//     const contents = [
+//       {
+//         parts: [{ text: systemPrompt }]
+//       },
+//       ...messages.map(m => ({
+//         parts: [{ text: m.content }]
+//       }))
+//     ];
+
+//     const response = await fetch(
+//       `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+//       {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({
+//           contents,
+//           generationConfig: {
+//             maxOutputTokens: 600,
+//             temperature: 0.8,
+//             topP: 0.95,
+//           },
+//           safetySettings: [
+//             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+//             { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+//             { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+//             { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+//           ]
+//         }),
+//       }
+//     );
+
+//     if (!response.ok) {
+//       const err = await response.json().catch(() => ({}));
+//       console.error('Gemini API Error:', response.status, err);
+//       if (response.status === 400 || response.status === 403) throw new Error('INVALID_KEY');
+//       if (response.status === 429) throw new Error('RATE_LIMIT');
+//       if (response.status >= 500) throw new Error('OVERLOADED');
+//       throw new Error('API_ERROR');
+//     }
+
+//     const data = await response.json();
+//     const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+//     if (!aiText) {
+//       console.error('No valid response from Gemini:', data);
+//       throw new Error('NO_RESPONSE');
+//     }
+//     return aiText;
+//   } catch (err) {
+//     console.error('Gemini API call failed:', err);
+//     throw err;
+//   }
+// }
+
 async function callGeminiAPI(messages) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === '') {
-    throw new Error('NO_KEY');
-  }
-
-  const systemPrompt = `You are MindEase AI — a compassionate dual-role mental health companion combining Clinical Psychology and Neurology expertise, built by Devansh Gupta & Team for users in India.
-
-PERSONA: Warm, empathetic, professionally grounded. Never robotic. Validate emotions first, then offer solutions. Use evidence-based approaches: CBT, mindfulness, psychoeducation. Ask ONE question at a time. Be conversational, not clinical.
-
-PSYCHOLOGY EXPERTISE: Anxiety, depression, stress, trauma, grief, relationships, self-esteem, OCD, PTSD, panic attacks. Teach: box breathing, grounding (5-4-3-2-1), journaling, cognitive reframing.
-
-NEUROLOGY EXPERTISE: Sleep disorders, headaches/migraines, brain fog, memory issues, ADHD, poor concentration. Explain brain-body connections. Suggest: sleep hygiene, diet, exercise, screen habits.
-
-ASSESSMENT: After 4-6 exchanges, if you sense the person needs professional help (persistent symptoms, severe distress, safety concerns), gently recommend a specialist. Specify PSYCHOLOGIST for emotional/mental issues, NEUROLOGIST for brain/sleep/physical symptoms, PSYCHIATRIST for medication needs or severe conditions.
-
-SAFETY: If self-harm or suicide is mentioned → immediately provide: iCall: 9152987821 | Vandrevala: 1860-2662-345 | NIMHANS: 080-46110007 | Emergency: 112. Urge them to call NOW.
-
-STYLE: 3-5 sentences unless more is needed. Warm conversational tone. End with a gentle question or empathetic suggestion. Be culturally aware of South Asian mental health stigma — normalize seeking help.
-
-IMPORTANT: When you identify the person likely needs a specific type of specialist, include this exact marker in your response: [NEEDS_SPECIALIST:psychologist] or [NEEDS_SPECIALIST:neurologist] or [NEEDS_SPECIALIST:psychiatrist] — this will trigger the app to show the right doctor. Only add this marker once, when you are genuinely confident.`;
-
   try {
-    // Convert messages to Gemini format (system as first content)
-    const contents = [
-      {
-        parts: [{ text: systemPrompt }]
-      },
-      ...messages.map(m => ({
-        parts: [{ text: m.content }]
-      }))
-    ];
+    const lastMessage = messages[messages.length - 1]?.content || "";
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          generationConfig: {
-            maxOutputTokens: 600,
-            temperature: 0.8,
-            topP: 0.95,
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
-          ]
-        }),
-      }
-    );
+    const response = await fetch("/.netlify/functions/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: lastMessage }),
+    });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      console.error('Gemini API Error:', response.status, err);
-      if (response.status === 400 || response.status === 403) throw new Error('INVALID_KEY');
-      if (response.status === 429) throw new Error('RATE_LIMIT');
-      if (response.status >= 500) throw new Error('OVERLOADED');
-      throw new Error('API_ERROR');
+      throw new Error("API_ERROR");
     }
 
     const data = await response.json();
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!aiText) {
-      console.error('No valid response from Gemini:', data);
-      throw new Error('NO_RESPONSE');
+
+    if (!data.reply) {
+      throw new Error("NO_RESPONSE");
     }
-    return aiText;
+
+    return data.reply;
+
   } catch (err) {
-    console.error('Gemini API call failed:', err);
+    console.error("Chat API failed:", err);
     throw err;
   }
 }
@@ -147,13 +177,13 @@ function getDemoResponse(text, conversationHistory = [], isFirstMessage = false)
 }
 
 async function callAI(messages) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === '') {
-    // Demo mode — use fallback with context
-    const lastMsg = messages[messages.length - 1]?.content || '';
-    const isFirstMessage = messages.length === 1;
-    return getDemoResponse(lastMsg, messages.slice(0, -1), isFirstMessage);
-  }
+  // const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  // if (!apiKey || apiKey.trim() === '') {
+  //   // Demo mode — use fallback with context
+  //   const lastMsg = messages[messages.length - 1]?.content || '';
+  //   const isFirstMessage = messages.length === 1;
+  //   return getDemoResponse(lastMsg, messages.slice(0, -1), isFirstMessage);
+  // }
   return await callGeminiAPI(messages);
 }
 
