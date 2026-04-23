@@ -1,5 +1,4 @@
-export default async function handler(event, context) {
-  // CORS headers
+export async function handler(event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -7,7 +6,7 @@ export default async function handler(event, context) {
     'Content-Type': 'application/json',
   };
 
-  // Handle preflight OPTIONS request
+  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -26,63 +25,60 @@ export default async function handler(event, context) {
   }
 
   try {
-    // Parse request body
-    const body = JSON.parse(event.body);
-    const { message } = body;
+    // Parse body
+    const { message } = JSON.parse(event.body || "{}");
 
     if (!message || typeof message !== 'string') {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Missing or invalid "message" field. Provide { "message": "your text" }' }),
+        body: JSON.stringify({ error: 'Invalid message' }),
       };
     }
 
-    // Gemini API key
     const apiKey = process.env.GEMINI_API_KEY;
+
     if (!apiKey) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'Gemini API key not configured.' }),
+        body: JSON.stringify({ error: 'API key missing' }),
       };
     }
 
-    // Gemini REST API request
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
-    const geminiPayload = {
-      contents: [
-        {
-          parts: [
+    // Call Gemini API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
             {
-              text: message
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-      },
-    };
-
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(geminiPayload),
-    });
+              parts: [{ text: message }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 512,
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
+
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response";
 
     return {
       statusCode: 200,
@@ -92,14 +88,13 @@ export default async function handler(event, context) {
 
   } catch (error) {
     console.error('Chat function error:', error);
-    
+
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error: ' + error.message }),
+      body: JSON.stringify({
+        error: 'Internal server error',
+      }),
     };
   }
 }
-
-// Netlify requires default export
-export { handler };
