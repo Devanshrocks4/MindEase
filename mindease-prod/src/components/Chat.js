@@ -141,40 +141,40 @@ async function callGeminiAPI(messages) {
 }
 
 // ── Demo fallback (if no API key) ──────────────────────────────────
-function getDemoResponse(text, conversationHistory = [], isFirstMessage = false) {
-  const t = text.toLowerCase();
-  const historyText = conversationHistory.map(m => m.content).join(' ').toLowerCase();
+// function getDemoResponse(text, conversationHistory = [], isFirstMessage = false) {
+//   const t = text.toLowerCase();
+//   const historyText = conversationHistory.map(m => m.content).join(' ').toLowerCase();
   
-  // Don't repeat intro after first message
-  if (!isFirstMessage && historyText.includes('VITE_GEMINI_API_KEY')) {
-    return "I understand you're sharing something important. While my full AI capabilities are offline (add VITE_GEMINI_API_KEY to .env for Gemini), I can still offer support. Tell me more about what you're experiencing?";
-  }
+//   // Don't repeat intro after first message
+//   if (!isFirstMessage && historyText.includes('VITE_GEMINI_API_KEY')) {
+//     return "I understand you're sharing something important. While my full AI capabilities are offline (add VITE_GEMINI_API_KEY to .env for Gemini), I can still offer support. Tell me more about what you're experiencing?";
+//   }
   
-  // Context-aware responses
-  if (t.includes('headache') || t.includes('headaches') || t.includes('migraine')) {
-    return "Frequent headaches can be really disruptive. From a neurology perspective, common triggers include tension, dehydration, sleep issues, or screen time. Try: staying hydrated, 20-20-20 rule (every 20 min, look 20ft away for 20sec), and gentle neck stretches. How long have they been happening and what makes them worse?";
-  }
-  if (t.includes('anxiety') || t.includes('anxious') || t.includes('worry')) {
-    return "I hear you — anxiety can feel overwhelming and all-consuming. Your feelings are completely valid. A simple technique that often helps is box breathing: inhale for 4 seconds, hold for 4, exhale for 4, hold for 4. Would you like to try it together, or would you prefer to talk more about what's been triggering your anxiety?";
-  }
-  if (t.includes('depress') || t.includes('sad') || t.includes('hopeless')) {
-    return "Thank you for sharing something so personal with me. Feeling depressed or hopeless can make every day feel like an uphill battle. You're not alone in this, and reaching out shows real courage. Can you tell me how long you've been feeling this way? That will help me understand what kind of support might be most helpful for you.";
-  }
-  if (t.includes('sleep') || t.includes('insomnia')) {
-    return "Sleep problems can have such a profound impact on everything — mood, focus, physical health. From a neuroscience perspective, our brains consolidate memories and repair themselves during sleep, so I understand how crucial this is. A few evidence-based approaches: keep consistent sleep/wake times, limit screens 1 hour before bed, and try a body scan meditation. What does your typical evening routine look like?";
-  }
-  if (t.includes('stress') || t.includes('overwhelmed')) {
-    return "Feeling overwhelmed is your mind and body signaling that you need some relief — it's not a sign of weakness. Stress often builds when we feel like we lack control. Let's break this down together. What's the one thing weighing on you most heavily right now? Sometimes naming it is the first step to releasing some of its power.";
-  }
+//   // Context-aware responses
+//   if (t.includes('headache') || t.includes('headaches') || t.includes('migraine')) {
+//     return "Frequent headaches can be really disruptive. From a neurology perspective, common triggers include tension, dehydration, sleep issues, or screen time. Try: staying hydrated, 20-20-20 rule (every 20 min, look 20ft away for 20sec), and gentle neck stretches. How long have they been happening and what makes them worse?";
+//   }
+//   if (t.includes('anxiety') || t.includes('anxious') || t.includes('worry')) {
+//     return "I hear you — anxiety can feel overwhelming and all-consuming. Your feelings are completely valid. A simple technique that often helps is box breathing: inhale for 4 seconds, hold for 4, exhale for 4, hold for 4. Would you like to try it together, or would you prefer to talk more about what's been triggering your anxiety?";
+//   }
+//   if (t.includes('depress') || t.includes('sad') || t.includes('hopeless')) {
+//     return "Thank you for sharing something so personal with me. Feeling depressed or hopeless can make every day feel like an uphill battle. You're not alone in this, and reaching out shows real courage. Can you tell me how long you've been feeling this way? That will help me understand what kind of support might be most helpful for you.";
+//   }
+//   if (t.includes('sleep') || t.includes('insomnia')) {
+//     return "Sleep problems can have such a profound impact on everything — mood, focus, physical health. From a neuroscience perspective, our brains consolidate memories and repair themselves during sleep, so I understand how crucial this is. A few evidence-based approaches: keep consistent sleep/wake times, limit screens 1 hour before bed, and try a body scan meditation. What does your typical evening routine look like?";
+//   }
+//   if (t.includes('stress') || t.includes('overwhelmed')) {
+//     return "Feeling overwhelmed is your mind and body signaling that you need some relief — it's not a sign of weakness. Stress often builds when we feel like we lack control. Let's break this down together. What's the one thing weighing on you most heavily right now? Sometimes naming it is the first step to releasing some of its power.";
+//   }
   
-  // Generic follow-up if no specific match
-  if (!isFirstMessage) {
-    return "Thank you for sharing that. I want to understand better so I can offer the most helpful support. Can you tell me more about what you're experiencing or how it's affecting you?";
-  }
+//   // Generic follow-up if no specific match
+//   if (!isFirstMessage) {
+//     return "Thank you for sharing that. I want to understand better so I can offer the most helpful support. Can you tell me more about what you're experiencing or how it's affecting you?";
+//   }
   
-  // First message fallback (original intro)
-  return "I'm glad you reached out — that takes real strength. I'm MindEase AI, your mental wellness companion with expertise in psychology and neurology. I'm here to listen without judgment and support you through whatever you're experiencing. To add your Gemini API key, edit the .env file and add VITE_GEMINI_API_KEY=your_key. What's been on your mind lately?";
-}
+//   // First message fallback (original intro)
+//   return "I'm glad you reached out — that takes real strength. I'm MindEase AI, your mental wellness companion with expertise in psychology and neurology. I'm here to listen without judgment and support you through whatever you're experiencing. To add your Gemini API key, edit the .env file and add VITE_GEMINI_API_KEY=your_key. What's been on your mind lately?";
+// }
 
 async function callAI(messages) {
   // const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
