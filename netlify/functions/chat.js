@@ -8,7 +8,11 @@ export async function handler(event) {
 
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
   // Only allow POST
@@ -41,17 +45,20 @@ export async function handler(event) {
       };
     }
 
-    // ✅ FINAL WORKING MODEL + ENDPOINT
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    // ✅ Correct endpoint + model
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
     const response = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey, // ✅ correct way to send key
+      },
       body: JSON.stringify({
         contents: [
           {
-            parts: [{ text: message }]
-          }
+            parts: [{ text: message }],
+          },
         ],
         generationConfig: {
           temperature: 0.7,
@@ -60,21 +67,18 @@ export async function handler(event) {
       }),
     });
 
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      console.error(`Gemini API Error (${response.status}):`, errorBody);
+    const data = await response.json();
 
+    if (!response.ok) {
+      console.error("Gemini API Error:", data);
       return {
         statusCode: response.status,
         headers,
         body: JSON.stringify({
-          error: `Google API ${response.status}`,
-          message: errorBody.error?.message || "API error",
+          error: data?.error?.message || "API error",
         }),
       };
     }
-
-    const data = await response.json();
 
     const reply =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
