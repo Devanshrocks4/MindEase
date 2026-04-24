@@ -46,8 +46,7 @@ export async function handler(event) {
     }
 
     // ✅ Correct endpoint + model
-    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-
+const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
