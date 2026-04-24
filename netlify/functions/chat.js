@@ -6,7 +6,7 @@ export async function handler(event) {
     'Content-Type': 'application/json',
   };
 
-  // Handle CORS preflight
+  // Handle CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -15,23 +15,23 @@ export async function handler(event) {
     };
   }
 
-  // Only allow POST
+  // Only POST allowed
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed. Use POST.' }),
+      body: JSON.stringify({ error: 'Method not allowed' }),
     };
   }
 
   try {
     const { message } = JSON.parse(event.body || "{}");
 
-    if (!message || typeof message !== 'string') {
+    if (!message) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Invalid message format' }),
+        body: JSON.stringify({ error: 'Message required' }),
       };
     }
 
@@ -41,17 +41,18 @@ export async function handler(event) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'API key missing in Netlify' }),
+        body: JSON.stringify({ error: 'API key missing' }),
       };
     }
 
-    // ✅ Correct endpoint + model
-const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+    // ✅ FINAL CORRECT ENDPOINT (NO :generateContent)
+    const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash";
+
     const response = await fetch(API_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey, // ✅ correct way to send key
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
         contents: [
@@ -59,17 +60,13 @@ const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-
             parts: [{ text: message }],
           },
         ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 512,
-        },
       }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Gemini API Error:", data);
+      console.error("Gemini Error:", data);
       return {
         statusCode: response.status,
         headers,
@@ -81,7 +78,7 @@ const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-
 
     const reply =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response generated.";
+      "No response";
 
     return {
       statusCode: 200,
@@ -89,16 +86,13 @@ const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-
       body: JSON.stringify({ reply }),
     };
 
-  } catch (error) {
-    console.error('Chat function execution error:', error);
+  } catch (err) {
+    console.error("Server error:", err);
 
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error.message,
-      }),
+      body: JSON.stringify({ error: "Internal server error" }),
     };
   }
 }
