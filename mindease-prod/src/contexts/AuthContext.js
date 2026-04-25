@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, isFirebaseConfigured } from '../services/firebase';
+import { auth, isFirebaseConfigured, db } from '../services/firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
 } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const AuthContext = createContext(null);
 
@@ -96,6 +97,14 @@ export const AuthProvider = ({ children }) => {
     }
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     if (displayName) await updateProfile(cred.user, { displayName });
+    
+    // Store user in Firestore
+    await setDoc(doc(db, "users", cred.user.uid), {
+      email: cred.user.email,
+      role: "user",
+      createdAt: serverTimestamp()
+    });
+    
     localStorage.setItem('mindease_user_id', cred.user.uid);
     return cred;
   };

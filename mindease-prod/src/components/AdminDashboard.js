@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaUsers, FaChartLine, FaDownload, FaSearch, FaTrash, FaEdit,
   FaPlus, FaEye, FaTimes, FaCheck, FaBan, FaUndo, FaSort,
   FaSortUp, FaSortDown, FaSync, FaFileExport, FaHeartbeat, FaBrain
 } from 'react-icons/fa';
-import io from 'socket.io-client';
-
-/* ─── helpers ───────────────────────────────────────────────────── */
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const adminHeaders = () => ({
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('token') || 'demo_token'}`
-});
+import { adminService } from '../services/firebaseService';
+import { db, isFirebaseConfigured } from '../services/firebase.js';
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot
+} from 'firebase/firestore';
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const fmtTime = (d) => d ? new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -129,7 +129,7 @@ function genDemoUsers(n = 20) {
 
 function genDemoAnalytics() {
   return {
-    totalUsers: 24, onlineUsers: 3, totalAssessments: 87, averageRiskScore: 42,
+    totalUsers: 24, totalAssessments: 87, averageRiskScore: 42, onlineUsers: 0,
     issueBreakdown: { stress: 18, depression: 12, anxiety: 16, sleep: 10, social: 8, behavioral: 9, emotional: 7, decision: 4, digital: 3 },
     riskLevelBreakdown: { Low: 35, Moderate: 38, High: 14 },
     recentAssessments: [
@@ -161,8 +161,8 @@ export default function AdminDashboard() {
   const [allUsers, setAllUsers]             = useState([]);
   const [allAssessments, setAllAssessments] = useState([]);
   const [groups, setGroups]                 = useState([]);
-  const [chats, setChats]                   = useState([]);
-  const [onlineUsers, setOnlineUsers]       = useState([]);
+  const [chats, setChats]                 = useState([]);
+  const [firestoreUsers, setFirestoreUsers] = useState([]);
   const [loading, setLoading]               = useState(true);
   const [refreshing, setRefreshing]         = useState(false);
 
@@ -190,7 +190,6 @@ export default function AdminDashboard() {
   const [formLoading, setFormLoading]       = useState(false);
 
   const [toast, setToast] = useState(null);
-  const socketRef = useRef(null);
 
   const showToast = useCallback((msg, type = 'success') => {
     setToast({ msg, type });
@@ -201,40 +200,49 @@ export default function AdminDashboard() {
   const fetchAll = useCallback(async (silent = false) => {
     silent ? setRefreshing(true) : setLoading(true);
     try {
-      try {
-        const r = await fetch(`${API}/api/admin/analytics`, { headers: adminHeaders() });
-        if (r.ok) { const d = await r.json(); if (d.success) setAnalytics(d.data); }
-      } catch {}
-      try {
-        const r = await fetch(`${API}/api/admin/users?limit=500`, { headers: adminHeaders() });
-        if (r.ok) { const d = await r.json(); if (d.success && d.data.length) setAllUsers(d.data); }
-      } catch {}
-      try {
-        const r = await fetch(`${API}/api/admin/assessments`, { headers: adminHeaders() });
-        if (r.ok) { const d = await r.json(); if (d.success) setAllAssessments(d.data); }
-      } catch {}
-      try {
-        const r = await fetch(`${API}/api/admin/groups`, { headers: adminHeaders() });
-        if (r.ok) { const d = await r.json(); if (d.success) setGroups(d.data); }
-      } catch {}
-    } catch {}
-    setLoading(false);
-    setRefreshing(false);
+      const { data, error } = await adminService.fetchAll();
+      if (error) {
+        console.error('Admin fetch error:', error);
+        return;
+      }
+      
+      if (data.analytics) setAnalytics(data.analytics);
+      if (data.users) setAllUsers(data.users);
+      if (data.assessments) setAllAssessments(data.assessments);
+      if (data.groups) setGroups(data.groups);
+    } catch (error) {
+      console.error('fetchAll error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Firestore real-time users listener
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db) return;
+
+    const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        _id: doc.id,
+        ...doc.data()
+      }));
+      setFirestoreUsers(userList);
+    }, (error) => {
+      console.error("Firestore listener error:", error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     // Seed demo users immediately so dashboard shows content
-    setAllUsers(genDemoUsers(20));
+    if (!isFirebaseConfigured) {
+      setAllUsers(genDemoUsers(20));
+    }
     fetchAll();
-    const socket = io(API);
-    socketRef.current = socket;
-    socket.emit('joinAdmin');
-    socket.on('userOnline',    d => setOnlineUsers(p => [...p.filter(u => u._id !== d.userId), { _id: d.userId }]));
-    socket.on('userOffline',   d => setOnlineUsers(p => p.filter(u => u._id !== d.userId)));
-    socket.on('newUser',       () => fetchAll(true));
-    socket.on('newAssessment', () => fetchAll(true));
-    socket.on('statsUpdate',   d => setAnalytics(p => ({ ...p, ...d })));
-    return () => socket.disconnect();
   }, [fetchAll]);
 
   /* CRUD */
@@ -246,19 +254,21 @@ export default function AdminDashboard() {
     if (Object.keys(errs).length) { setFormErrors(errs); return; }
     setFormLoading(true);
     try {
-      const r = await fetch(`${API}/api/admin/user`, { method: 'POST', headers: adminHeaders(), body: JSON.stringify(form) });
-      const d = await r.json();
-      if (d.success) {
-        setAllUsers(p => [d.data, ...p]);
-        setAnalytics(p => ({ ...p, totalUsers: p.totalUsers + 1 }));
-        setShowAdd(false);
-        setForm({ name: '', email: '', password: '', role: 'user', isActive: true });
-        showToast('User created successfully ✓');
-      } else { setFormErrors({ server: d.message }); }
-    } catch {
+      const result = await adminService.addUser(form);
+      if (result.error) {
+        setFormErrors({ server: result.error });
+        return;
+      }
+      setAllUsers(p => [result.data, ...p]);
+      setAnalytics(p => ({ ...p, totalUsers: (p.totalUsers || 0) + 1 }));
+      setShowAdd(false);
+      setForm({ name: '', email: '', password: '', role: 'user', isActive: true });
+      showToast('User created successfully ✓');
+    } catch (error) {
+      console.error('Create user error:', error);
       const demo = { _id: `demo_${Date.now()}`, name: form.name, email: form.email, role: form.role, isActive: true, createdAt: new Date(), lastLogin: null };
       setAllUsers(p => [demo, ...p]);
-      setAnalytics(p => ({ ...p, totalUsers: p.totalUsers + 1 }));
+      setAnalytics(p => ({ ...p, totalUsers: (p.totalUsers || 0) + 1 }));
       setShowAdd(false);
       setForm({ name: '', email: '', password: '', role: 'user', isActive: true });
       showToast('User created (demo mode) ✓');
@@ -274,15 +284,16 @@ export default function AdminDashboard() {
     if (Object.keys(errs).length) { setFormErrors(errs); return; }
     setFormLoading(true);
     try {
-      const r = await fetch(`${API}/api/admin/user/${editTarget._id}`, {
-        method: 'PUT', headers: adminHeaders(),
-        body: JSON.stringify({ name: form.name, email: form.email, role: form.role, isActive: form.isActive })
-      });
-      const d = await r.json();
-      const updated = d.success ? d.data : { name: form.name, email: form.email, role: form.role, isActive: form.isActive };
-      setAllUsers(p => p.map(u => u._id === editTarget._id ? { ...u, ...updated } : u));
+      const updates = { name: form.name, email: form.email, role: form.role, isActive: form.isActive };
+      const { data, error } = await adminService.updateUser(editTarget._id, updates);
+      if (error) {
+        showToast('Failed to update user', 'error');
+        return;
+      }
+      setAllUsers(p => p.map(u => u._id === editTarget._id ? { ...u, ...data } : u));
       showToast('User updated ✓');
-    } catch {
+    } catch (error) {
+      console.error('Update user error:', error);
       setAllUsers(p => p.map(u => u._id === editTarget._id ? { ...u, name: form.name, email: form.email, role: form.role, isActive: form.isActive } : u));
       showToast('User updated (demo mode) ✓');
     }
@@ -292,31 +303,58 @@ export default function AdminDashboard() {
   };
 
   const handleDelete = async (userId) => {
-    try { await fetch(`${API}/api/admin/user/${userId}`, { method: 'DELETE', headers: adminHeaders() }); } catch {}
-    setAllUsers(p => p.filter(u => u._id !== userId));
-    setAnalytics(p => ({ ...p, totalUsers: Math.max(0, p.totalUsers - 1) }));
-    showToast('User deleted', 'error');
+    try {
+      const { error } = await adminService.deleteUser(userId);
+      if (error) throw new Error(error.message);
+      setAllUsers(p => p.filter(u => u._id !== userId));
+      setAnalytics(p => ({ ...p, totalUsers: Math.max(0, (p.totalUsers || 0) - 1) }));
+      showToast('User deleted', 'error');
+    } catch (error) {
+      console.error('Delete user error:', error);
+      setAllUsers(p => p.filter(u => u._id !== userId));
+      showToast('User deleted (demo mode)', 'error');
+    }
   };
 
   const handleToggle = async (user) => {
     const next = !(user.isActive !== false);
-    try { await fetch(`${API}/api/admin/user/${user._id}`, { method: 'PUT', headers: adminHeaders(), body: JSON.stringify({ isActive: next }) }); } catch {}
-    setAllUsers(p => p.map(u => u._id === user._id ? { ...u, isActive: next } : u));
-    showToast(next ? 'User activated ✓' : 'User deactivated');
+    try {
+      const { error } = await adminService.updateUser(user._id, { isActive: next });
+      if (error) throw new Error(error.message);
+      setAllUsers(p => p.map(u => u._id === user._id ? { ...u, isActive: next } : u));
+      showToast(next ? 'User activated ✓' : 'User deactivated');
+    } catch (error) {
+      console.error('Toggle user error:', error);
+      setAllUsers(p => p.map(u => u._id === user._id ? { ...u, isActive: next } : u));
+      showToast(next ? 'User activated (demo)' : 'User deactivated (demo)');
+    }
   };
 
   const handleDelAssessment = async (id) => {
-    try { await fetch(`${API}/api/admin/assessment/${id}`, { method: 'DELETE', headers: adminHeaders() }); } catch {}
-    setAllAssessments(p => p.filter(a => (a._id || a.id) !== id));
-    showToast('Assessment deleted', 'error');
+    try {
+      const { error } = await adminService.deleteAssessment(id);
+      if (error) throw new Error(error.message);
+      setAllAssessments(p => p.filter(a => (a._id || a.id) !== id));
+      showToast('Assessment deleted', 'error');
+    } catch (error) {
+      console.error('Delete assessment error:', error);
+      setAllAssessments(p => p.filter(a => (a._id || a.id) !== id));
+      showToast('Assessment deleted (demo)', 'error');
+    }
   };
 
   const openView = async (user) => {
     setViewTarget(user); setUserAssessments([]); setShowView(true);
     try {
-      const r = await fetch(`${API}/api/admin/user/${user._id}/assessments`, { headers: adminHeaders() });
-      if (r.ok) { const d = await r.json(); if (d.success) setUserAssessments(d.data); }
-    } catch {}
+      const { data, error } = await adminService.getUserAssessments(user._id);
+      if (error) {
+        console.error('Get assessments error:', error);
+        return;
+      }
+      setUserAssessments(data || []);
+    } catch (error) {
+      console.error('Get assessments error:', error);
+    }
   };
 
   const openEdit = (user) => {
@@ -346,20 +384,24 @@ export default function AdminDashboard() {
 
   /* filter / sort / paginate */
   const processed = React.useMemo(() => {
-    let list = [...allUsers];
-    if (searchTerm) list = list.filter(u => (u.name + ' ' + u.email).toLowerCase().includes(searchTerm.toLowerCase()));
+    // Prefer Firestore users if available, fallback to service/demo
+    let list = firestoreUsers.length > 0 ? [...firestoreUsers] : [...allUsers];
+    
+    if (searchTerm) list = list.filter(u => (u.email || u.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
     if (filterRole !== 'all') list = list.filter(u => u.role === filterRole);
-    if (filterStatus === 'active') list = list.filter(u => u.isActive !== false);
+    if (filterStatus === 'active') list = list.filter(u => (u.isActive !== false && !('isActive' in u) /* default active */));
     else if (filterStatus === 'inactive') list = list.filter(u => u.isActive === false);
-    else if (filterStatus === 'online') list = list.filter(u => onlineUsers.some(o => o._id === u._id));
     list.sort((a, b) => {
       let va = a[sortKey] ?? '', vb = b[sortKey] ?? '';
-      if (['createdAt', 'lastLogin'].includes(sortKey)) { va = va ? +new Date(va) : 0; vb = vb ? +new Date(vb) : 0; }
+      if (['createdAt', 'lastLogin'].includes(sortKey)) { 
+        va = va ? +new Date(va) : 0; 
+        vb = vb ? +new Date(vb) : 0; 
+      }
       if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
       return sortDir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0);
     });
     return list;
-  }, [allUsers, searchTerm, filterRole, filterStatus, sortKey, sortDir, onlineUsers]);
+  }, [firestoreUsers, allUsers, searchTerm, filterRole, filterStatus, sortKey, sortDir]);
 
   useEffect(() => setCurrentPage(1), [searchTerm, filterRole, filterStatus, sortKey, sortDir]);
   const totalPages = Math.ceil(processed.length / PER_PAGE);
@@ -411,7 +453,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="font-display text-3xl font-bold text-white">⚙ Admin Panel</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-              MindEase Control Centre · {allUsers.length} users · {allAssessments.length} assessments
+              MindEase Control Centre · {firestoreUsers.length > 0 ? firestoreUsers.length : allUsers.length} users · {allAssessments.length} assessments
             </p>
           </div>
           <div className="flex gap-2">
@@ -443,7 +485,7 @@ export default function AdminDashboard() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <StatCard icon={<FaUsers />}            label="Total Users"      value={analytics.totalUsers}       color="var(--violet)" />
-              <StatCard icon="🟢"                    label="Online Now"       value={onlineUsers.length || analytics.onlineUsers}  color="var(--emerald)" />
+              <StatCard icon="🟢"                    label="Online Now"       value={analytics.onlineUsers || 0}  color="var(--emerald)" />
               <StatCard icon={<FaHeartbeat />}        label="Assessments"      value={analytics.totalAssessments}  color="var(--cyan)" />
               <StatCard icon={<FaChartLine />}        label="Avg Risk Score"   value={`${analytics.averageRiskScore}%`} color="var(--amber)" />
               <StatCard icon="⚠"                     label="High Risk"        value={analytics.riskLevelBreakdown?.High || 0}  color="var(--rose)" />
@@ -529,7 +571,6 @@ export default function AdminDashboard() {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="online">Online</option>
               </select>
               <button className="btn-ghost flex items-center gap-2 text-sm px-4 py-2.5" onClick={() => exportCSV(processed, 'users.csv')}>
                 <FaFileExport /> CSV
@@ -567,9 +608,6 @@ export default function AdminDashboard() {
                             <div className="font-medium text-white leading-tight">{user.name}</div>
                             <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{user.email}</div>
                           </div>
-                          {onlineUsers.some(o => o._id === user._id) && (
-                            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" title="Online" />
-                          )}
                         </div>
                       </td>
                       <td className="py-3 px-4"><Badge status={user.role || 'user'} /></td>
@@ -894,9 +932,6 @@ export default function AdminDashboard() {
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <Badge status={viewTarget.role || 'user'} />
                   <Badge status={viewTarget.isActive !== false ? 'active' : 'inactive'} />
-                  {onlineUsers.some(o => o._id === viewTarget._id) && (
-                    <span className="badge badge-emerald text-xs">🟢 Online</span>
-                  )}
                 </div>
               </div>
             </div>
