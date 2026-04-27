@@ -16,123 +16,130 @@
 
 👉 https://mindeasewell.netlify.app/
 
----
-
 </div>
 
 ---
 
 # 🌌 Overview
 
-MindEase is a **full-stack AI-powered mental wellness platform**
-combining clinical assessments, AI therapy, and real-time analytics.
+MindEase is a **full-stack AI-powered mental wellness platform** designed to deliver
+**accessible, intelligent, and real-time psychological support**.
+
+It integrates:
+
+* 🧪 Clinical Assessments
+* 🤖 AI Therapy (Gemini)
+* 📊 Data Analytics
+* ⚡ Real-Time Systems
 
 ---
 
-# 🧩 System Architecture  
+# 🧩 System Architecture
 
-> Scalable 3-tier modular architecture with real-time and AI integration  
+> Scalable 3-tier modular architecture with real-time and AI integration
 
 <div align="center">
-  <img src="assets/figure1.png" width="100%" />
+  <img src="figure1.png" width="95%" style="border-radius:12px;" />
 </div>
 
 ---
 
-# 🗄️ Database Design (ERD)  
+# 🗄️ Database Design (ERD)
 
-> Structured MongoDB schema with relationships  
+> Structured MongoDB schema with relationships
 
 <div align="center">
-  <img src="assets/figure2.png" width="100%" />
+  <img src="figure2.png" width="95%" style="border-radius:12px;" />
 </div>
 
 ---
 
-# 🔄 Assessment Processing Flow  
+# 🔄 Assessment Processing Flow
 
-> From user interaction → scoring → insights → storage  
+> User interaction → scoring → insights → storage
 
 <div align="center">
-  <img src="assets/figure3.png" width="100%" />
+  <img src="figure3.png" width="95%" style="border-radius:12px;" />
 </div>
 
 ---
 
-# 🤖 AI Therapy Flow  
+# 🤖 AI Therapy Flow
 
-> Full pipeline from user input → backend → Gemini AI → response  
+> User → Backend → Gemini AI → Response Loop
 
 <div align="center">
-  <img src="assets/figure4.png" width="100%" />
+  <img src="figure4.png" width="95%" style="border-radius:12px;" />
 </div>
 
-# 🎯 Feature Modules
+---
+
+# 🎯 Core Modules
 
 ## 🧪 Assessment Engine
 
-* [x] 9 Clinical Tests
+* [x] 9 Clinical Tests (PSS-10, GAD-7, PHQ-9, etc.)
 * [x] Dynamic Question Rendering
-* [x] Auto Scoring
+* [x] Automated Scoring Algorithm
 * [x] Severity Classification
-* [x] DB Persistence
+* [x] Data Persistence
 
 ---
 
-## 🤖 AI Therapy
+## 🤖 AI Therapy System
 
-* [x] Gemini Integration
-* [x] Context-aware Chat
-* [x] Real-time Messaging
-* [x] Emotion-aware Flow
+* [x] Google Gemini Integration
+* [x] Context-aware Conversations
+* [x] Multi-turn Memory Handling
+* [x] Emotion-based Interaction
 
 ---
 
-## 📊 Dashboard
+## 📊 User Dashboard
 
-* [x] Trend Visualization
-* [x] Recharts Integration
-* [x] Wellness Index
-* [x] Recommendations
+* [x] Real-time Mental Health Tracking
+* [x] Recharts Visualizations
+* [x] Wellness Index Score
+* [x] Personalized Recommendations
 
 ---
 
 ## 🛠️ Admin Panel
 
-* [x] User Management
-* [x] Analytics
+* [x] User Management System
 * [x] Chat Monitoring
-* [x] System Control
+* [x] Analytics Dashboard
+* [x] Real-time Activity Tracking
 
 ---
 
-## ⚡ Real-Time System
+## ⚡ Real-Time Engine
 
-* [x] Socket.io
-* [x] Live Updates
+* [x] Socket.io Integration
+* [x] Live Chat Updates
 * [x] Event Broadcasting
 
 ---
 
 # 🧠 Tech Stack
 
-### Frontend
+### 🎨 Frontend
 
 React 18 · Tailwind CSS · Framer Motion · Recharts
 
-### Backend
+### ⚙️ Backend
 
 Node.js · Express.js
 
-### Database
+### 🗄️ Database
 
 MongoDB · Firebase
 
-### AI
+### 🤖 AI
 
 Google Gemini API
 
-### Deployment
+### ☁️ Deployment
 
 Netlify · Railway
 
@@ -140,31 +147,31 @@ Netlify · Railway
 
 # 🔐 Security
 
-* [x] Firebase Authentication
-* [x] JWT-based auth flow
-* [x] API key protection
-* [x] Role-based access
+* 🔑 Firebase Authentication
+* 🔒 JWT-based Authorization
+* 🛡️ Secure API Handling
+* ⚙️ Environment Variables
 
 ---
 
 # 🚀 Future Scope
 
-* [ ] Video Therapy
-* [ ] Multi-language Support
-* [ ] Advanced Emotion AI
-* [ ] Wearable Integration
+* 🎥 Video Therapy Sessions
+* 🌍 Multi-language Support
+* 🧠 Advanced Emotion Detection
+* ⌚ Wearable Integration
 
 ---
 
 # 👨‍💻 Author
 
 **Devansh Gupta**
-AI + Web Development + Mental Health Tech
+AI | Web Development | Mental Health Tech
 
 ---
 
 <div align="center">
 
-⭐ *Technology that understands humans*
+⭐ *Building technology that understands humans*
 
 </div>
