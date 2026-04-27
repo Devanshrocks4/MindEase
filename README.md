@@ -141,7 +141,7 @@ Google Gemini API
 
 ### ☁️ Deployment
 
-Netlify · Railway
+Netlify · Firebase
 
 ---
 
