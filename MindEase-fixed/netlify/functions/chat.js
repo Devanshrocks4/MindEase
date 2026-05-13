@@ -41,12 +41,21 @@ exports.handler = async function(event) {
     // Get current message if not in messages array
     var currentMessage = message || (messages && messages.length > 0 ? messages[messages.length - 1].content : message);
 
-    // Check for API key
+    // Check for API key - allow client-side override for debugging
     var apiKey = process.env.GEMINI_API_KEY;
+    var clientApiKey = body.apiKey;
+    
+    // Use client-provided key if available (for local development)
+    if (clientApiKey && !apiKey) {
+      apiKey = clientApiKey;
+      console.log('[chat] Using client-provided API key');
+    }
+    
     console.log('[chat] API key exists:', !!apiKey);
+    console.log('[chat] API key prefix:', apiKey ? apiKey.substring(0, 8) + '...' : 'none');
     
     if (!apiKey) {
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: 'API key not configured. Please contact the administrator.' }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: '🔑 API key not configured. Please contact the administrator or set GEMINI_API_KEY in Netlify dashboard.' }) };
     }
 
     // Build the prompt with psychologist persona
