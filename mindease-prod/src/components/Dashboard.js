@@ -270,28 +270,25 @@ export default function Dashboard() {
     </div>
   );
 
-  // Empty state — STILL shows the diagnostic so you can see why
+// Empty state
   if (assessments.length === 0) return (
     <div className="min-h-screen pt-20 pb-12 px-4 relative" style={{ background: 'var(--bg-primary)' }}>
       <div className="orb orb-1" /><div className="orb orb-2" />
       <div className="max-w-3xl mx-auto relative z-10">
-        <DiagPanel diag={diag} />
         <div className="text-center card p-10">
           <div className="text-5xl mb-4">📊</div>
           <h2 className="font-display text-2xl font-bold text-white mb-2">No assessments yet</h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>The diagnostic panel above explains why. Read it carefully.</p>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>Take your first wellness assessment to get started!</p>
           <button onClick={() => navigate('/assessment/stress')} className="btn-primary px-8 py-3 text-sm"><span>Take First Assessment →</span></button>
         </div>
       </div>
     </div>
   );
 
-  return (
+return (
     <div className="min-h-screen pt-20 pb-12 px-4 relative" style={{ background: 'var(--bg-primary)' }}>
       <div className="orb orb-1" /><div className="orb orb-2" />
       <div className="max-w-5xl mx-auto relative z-10">
-        <DiagPanel diag={diag} />
-
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="badge badge-teal mb-3 w-fit">Your Wellness Hub</div>
           <h1 className="font-display text-3xl font-bold text-white mb-1">
