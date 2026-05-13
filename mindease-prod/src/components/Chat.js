@@ -658,14 +658,40 @@ export default function Chat({ userId }) {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
-  const startChat = useCallback((m) => {
+const startChat = useCallback(async (m) => {
     setStep('chat');
-    const mCtx = m ? ` I see you're feeling ${m.label.toLowerCase()} today.` : '';
+    const mCtx = m ? ` I notice you're feeling ${m.label.toLowerCase()} today.` : '';
+    
+    // Start with a loading state while AI generates first message
     setMessages([{
       id: 1, role: 'assistant',
-      content: `Hi ${name}! I'm MindEase AI — your mental wellness companion powered by Gemini.${mCtx} I bring expertise in both psychology and neurology to support you. Whatever's on your mind, I'm here to listen without judgment. What would you like to talk about today?`,
+      content: '',
       ts: new Date()
     }]);
+    setLoading(true);
+
+    try {
+      // Call AI to get the first greeting
+      const firstMessage = m ? `[User's current mood: ${m.label}] ${name} is starting a new chat session` : `${name} is starting a new chat session`;
+      
+      const history = [{ role: 'user', content: firstMessage }];
+      const rawReply = await callAI(history);
+      
+      // Update the first message with AI response
+      setMessages([{
+        id: 1, role: 'assistant',
+        content: rawReply,
+        ts: new Date()
+      }]);
+    } catch (err) {
+      // Fallback if AI fails
+      setMessages([{
+        id: 1, role: 'assistant',
+        content: `Hi ${name}! I'm MindEase AI — your mental wellness companion.${mCtx} I'm here to listen without judgment. What's on your mind today?`,
+        ts: new Date()
+      }]);
+    }
+    setLoading(false);
   }, [name]);
 
   const processAIResponse = useCallback((reply, updatedMessages) => {
