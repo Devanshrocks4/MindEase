@@ -1,104 +1,5 @@
-// export async function handler(event) {
-//   const headers = {
-//     'Access-Control-Allow-Origin': '*',
-//     'Access-Control-Allow-Headers': 'Content-Type',
-//     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-//     'Content-Type': 'application/json',
-//   };
-
-//   // Handle CORS
-//   if (event.httpMethod === 'OPTIONS') {
-//     return {
-//       statusCode: 200,
-//       headers,
-//       body: '',
-//     };
-//   }
-
-//   // Only POST allowed
-//   if (event.httpMethod !== 'POST') {
-//     return {
-//       statusCode: 405,
-//       headers,
-//       body: JSON.stringify({ error: 'Method not allowed' }),
-//     };
-//   }
-
-//   try {
-//     const { message } = JSON.parse(event.body || "{}");
-
-//     if (!message) {
-//       return {
-//         statusCode: 400,
-//         headers,
-//         body: JSON.stringify({ error: 'Message required' }),
-//       };
-//     }
-
-//     const apiKey = process.env.GEMINI_API_KEY;
-
-//     if (!apiKey) {
-//       return {
-//         statusCode: 500,
-//         headers,
-//         body: JSON.stringify({ error: 'API key missing' }),
-//       };
-//     }
-
-//     // ✅ FINAL CORRECT ENDPOINT (NO :generateContent)
-//     const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash";
-
-//     const response = await fetch(API_URL, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         "x-goog-api-key": apiKey,
-//       },
-//       body: JSON.stringify({
-//         contents: [
-//           {
-//             parts: [{ text: message }],
-//           },
-//         ],
-//       }),
-//     });
-
-//     const data = await response.json();
-
-//     if (!response.ok) {
-//       console.error("Gemini Error:", data);
-//       return {
-//         statusCode: response.status,
-//         headers,
-//         body: JSON.stringify({
-//           error: data?.error?.message || "API error",
-//         }),
-//       };
-//     }
-
-//     const reply =
-//       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-//       "No response";
-
-//     return {
-//       statusCode: 200,
-//       headers,
-//       body: JSON.stringify({ reply }),
-//     };
-
-//   } catch (err) {
-//     console.error("Server error:", err);
-
-//     return {
-//       statusCode: 500,
-//       headers,
-//       body: JSON.stringify({ error: "Internal server error" }),
-//     };
-//   }
-// }
-
 // netlify/functions/chat.js
-// Full psychologist AI with conversation history
+// Full psychologist AI with conversation history with system prompt
 
 const SYSTEM_PROMPT = `You are MindEase AI — a compassionate, professional mental health companion with combined expertise in Clinical Psychology and Neurology. You were created for MindEase, a mental wellness platform for users in India, built by Devansh Gupta & Team.
 
@@ -175,6 +76,7 @@ export async function handler(event) {
     const body = JSON.parse(event.body || '{}');
     const { message, messages } = body;
 
+    // Accept both formats: single message or messages array (conversation history)
     if (!message && (!messages || !Array.isArray(messages) || messages.length === 0)) {
       return {
         statusCode: 400,
@@ -183,7 +85,7 @@ export async function handler(event) {
       };
     }
 
-    // Accept both env var names for compatibility
+    // Read API key from environment - support both names for compatibility
     const apiKey = process.env.GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -205,8 +107,9 @@ export async function handler(event) {
       contents = messages.map((m, i) => {
         const isUser = m.role === 'user';
         let text = m.content || '';
+        // Only inject system prompt into the first user message
         if (i === 0 && isUser) {
-          text = `${SYSTEM_PROMPT}\n\n---\n\nUser's first message: ${text}`;
+          text = `${SYSTEM_PROMPT}\n\n---\n\nUser's message: ${text}`;
         }
         return {
           role: isUser ? 'user' : 'model',
