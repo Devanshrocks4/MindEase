@@ -41,9 +41,13 @@ exports.handler = async function(event) {
     // Get current message if not in messages array
     var currentMessage = message || (messages && messages.length > 0 ? messages[messages.length - 1].content : message);
 
-    // Check for API key - allow client-side override for debugging
+// Check for API key - check multiple sources for flexibility
     var apiKey = process.env.GEMINI_API_KEY;
     var clientApiKey = body.apiKey;
+    
+    // Also check other common env var names
+    if (!apiKey) apiKey = process.env.GEMINI_API_KEY_1;
+    if (!apiKey) apiKey = process.env.VITE_GEMINI_API_KEY;
     
     // Use client-provided key if available (for local development)
     if (clientApiKey && !apiKey) {
@@ -52,10 +56,12 @@ exports.handler = async function(event) {
     }
     
     console.log('[chat] API key exists:', !!apiKey);
-    console.log('[chat] API key prefix:', apiKey ? apiKey.substring(0, 8) + '...' : 'none');
+    console.log('[chat] API key prefix:', apiKey ? apiKey.substring(0, 10) + '...' : 'none');
+    console.log('[chat] All env keys:', Object.keys(process.env).filter(k => k.includes('GEMINI')).join(', '));
     
     if (!apiKey) {
-      return { statusCode: 200, headers, body: JSON.stringify({ reply: '🔑 API key not configured. Please contact the administrator or set GEMINI_API_KEY in Netlify dashboard.' }) };
+      console.error('[chat] NO API KEY FOUND - env vars available:', Object.keys(process.env).join(', '));
+      return { statusCode: 200, headers, body: JSON.stringify({ reply: '🔑 AI service not configured. Please contact the administrator.' }) };
     }
 
     // Build the prompt with psychologist persona
