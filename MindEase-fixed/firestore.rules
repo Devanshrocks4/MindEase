@@ -1,0 +1,83 @@
+rules_version = '2';
+
+// ────────────────────────────────────────────────────────────────────
+//  MindEase — Firestore Security Rules
+//
+//  Deploy via Firebase Console → Firestore → Rules tab → paste → Publish
+//  OR via CLI:  firebase deploy --only firestore:rules
+// ────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ───────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isAdmin() {
+      // Hardcoded admin emails — MUST match ADMIN_EMAILS in AuthContext.js
+      return isSignedIn() && request.auth.token.email in [
+        'admin@mindease.com',
+        'admin@mind.com',
+        'devansh@mindease.com',
+        'jasica@kaur.com',
+        'devansh@gupta.com'
+      ];
+    }
+
+    // ── USERS collection ──────────────────────────────────────────────
+    // doc id = Firebase Auth UID
+    match /users/{userId} {
+      // Anyone signed in can read their own doc; admins read all
+      allow read:   if isOwner(userId) || isAdmin();
+      // Allow creating own doc on signup; admins can create any
+      allow create: if isOwner(userId) || isAdmin();
+      // Owners update own profile; admins update anyone
+      allow update: if isOwner(userId) || isAdmin();
+      // Only admins delete
+      allow delete: if isAdmin();
+    }
+
+    // ── ASSESSMENTS collection ────────────────────────────────────────
+    match /assessments/{assessmentId} {
+      // Read: owner reads own assessments; admin reads all
+      allow read:   if isAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Create: must stamp the user's own UID on the document
+      allow create: if isSignedIn() &&
+                       request.resource.data.userId == request.auth.uid;
+      // Update/Delete: owner or admin
+      allow update: if isAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // ── LOGIN ACTIVITIES (audit log) ──────────────────────────────────
+    match /loginActivities/{activityId} {
+      // Users can add their own login records
+      allow create: if isSignedIn() &&
+                       request.resource.data.userId == request.auth.uid;
+      // Only admins read the full audit log
+      allow read:   if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── CHATS collection (saved AI chat sessions) ─────────────────────
+    match /chats/{chatId} {
+      allow read:   if isAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                       request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // ── Default deny everything else ──────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
