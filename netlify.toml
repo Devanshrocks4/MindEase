@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────
+#  Netlify build configuration for MindEase
+#
+#  PLACE THIS FILE AT THE ROOT of your GitHub repo (NOT inside mindease-prod).
+#  i.e. MindEase/netlify.toml   (sibling to mindease-prod/)
+#
+#  This tells Netlify:
+#    1) The actual React app lives in the mindease-prod subdirectory
+#    2) Where to find the serverless functions
+#    3) The build command + publish folder
+# ─────────────────────────────────────────────────────────────────
+
+[build]
+  base      = "mindease-prod"
+  publish   = "build"
+  command   = "npm install && npm run build"
+  functions = "netlify/functions"
+
+# Make sure SPA routes (e.g. /dashboard, /admin) all serve index.html
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# Helpful: explicit functions path so /.netlify/functions/chat resolves
+[functions]
+  node_bundler = "esbuild"
+
+# Environment hint (Netlify reads CRA env vars at build-time from UI)
+[build.environment]
+  NODE_VERSION = "18"
+  CI           = "false"
