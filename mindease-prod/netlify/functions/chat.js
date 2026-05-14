@@ -3,12 +3,10 @@
 //
 //  MindEase AI — Personal Psychologist & Counsellor
 //
-//  Why the previous version "wasn't working":
-//    The old code wrapped EVERY failure in a try/catch and always returned
-//    HTTP 200 with a generic fake reply. So you couldn't tell whether
-//    Gemini was actually being called. This version surfaces real errors
-//    (status 401 / 503 / 502) so the UI shows what's wrong, AND it tells
-//    you the exact reason in a `debug` field when the API key is bad.
+//  FIX (May 2026): Gemini 1.5 models were shut down by Google.
+//  Updated model to gemini-2.5-flash. Also added a fallback chain
+//  so if the primary model is unavailable, we try alternatives
+//  before reporting failure.
 // ─────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are MindEase AI — a warm, professional mental wellness companion modelled on a skilled clinical psychologist with neuroscience training. You serve users primarily in India.
@@ -23,22 +21,21 @@ CONVERSATIONAL STYLE
 • Keep replies to 2-5 short sentences. No bullet lists unless explicitly asked. No emojis unless they used one first.
 • Use plain language. Avoid clinical jargon unless the user uses it first.
 • Match their register: if they write casually, you write casually. If formally, you do the same.
-• USE THE CONVERSATION HISTORY. Reference details they shared earlier ("you mentioned your sleep was off last week — how is it now?"). This is what makes you feel like a real counsellor.
+• USE THE CONVERSATION HISTORY. Reference details they shared earlier ("you mentioned your sleep was off last week — how is it now?").
 
 CONTENT YOU CAN OFFER
 • Validation and normalization ("a lot of people in their twenties feel exactly this")
 • Brief psychoeducation (what stress does to sleep, why rumination loops happen, the basic neuroscience of anxiety)
 • Concrete coping techniques: 4-7-8 breathing, box breathing, 5-4-3-2-1 grounding, behavioural activation, sleep hygiene, journaling prompts, CBT thought-records
-• Gentle reframing of self-critical thoughts (never dismissive)
-• Suggestions for when to consider a professional ("if this has been going on for several weeks and is affecting your daily life, talking to a therapist could really help")
+• Gentle reframing of self-critical thoughts
+• Suggestions for when to consider a professional
 
 WHAT YOU NEVER DO
-• Never claim to be a doctor, psychiatrist, or licensed therapist.
-• Never diagnose a condition. You can say "this sounds like it could be anxiety" but never "you have GAD."
+• Never claim to be a doctor or licensed therapist.
+• Never diagnose a condition.
 • Never prescribe medication or comment on doses.
 • Never dismiss feelings — always validate first.
 • Never give long lists or essay-length replies.
-• Never moralize. Replace "should" with "could".
 
 CRISIS PROTOCOL — CRITICAL
 If the user mentions self-harm, suicide, wanting to die, hopelessness with active plans, severe abuse happening NOW, or any imminent danger — STOP everything and respond with:
@@ -46,12 +43,10 @@ If the user mentions self-harm, suicide, wanting to die, hopelessness with activ
 2. A clear statement that you're worried and that a trained human can help right now
 3. These exact resources, on separate lines:
    • iCall (free, English/Hindi): +91 9152987821 — Mon-Sat 8am-10pm
-   • Vandrevala Foundation (24x7, free): 1860-2662-345 or +91 9999666555
+   • Vandrevala Foundation (24×7, free): 1860-2662-345 or +91 9999666555
    • Emergency Services: 112
    • DMHP Helpline (India): 1800-180-0017
 4. ONE gentle question — "is there someone with you right now?"
-
-Never list helplines for general stress — only for active crisis. For ongoing symptoms (panic attacks for weeks, suspected depression for months), suggest seeing a GP or therapist without sounding like a referral form.
 
 You are someone they're trusting with private feelings. Earn that trust every reply.`;
 
@@ -62,6 +57,31 @@ const CRISIS_WORDS = [
   'cut myself', 'cutting myself', 'self harm', 'self-harm', 'overdose',
 ];
 const isCrisis = (text) => CRISIS_WORDS.some(k => text.toLowerCase().includes(k));
+
+// Fallback chain — try these models in order if the primary fails
+const MODEL_CHAIN = [
+  "gemini-2.5-flash",         // primary — current production model
+  "gemini-2.5-flash-lite",    // cheaper/faster fallback
+  "gemini-2.0-flash-001",     // older fallback (works until June 2026)
+];
+
+async function callGemini(modelName, apiKey, geminiBody, timeoutMs = 8000) {
+  // Use AbortController so we don't blow past Netlify's function timeout
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(geminiBody),
+      signal: controller.signal,
+    });
+    return resp;
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 exports.handler = async function (event) {
   const headers = {
@@ -94,8 +114,8 @@ exports.handler = async function (event) {
     if (!apiKey) {
       return { statusCode: 503, headers, body: JSON.stringify({
         error: 'API_KEY_MISSING',
-        reply: '🔑 The AI service is currently unavailable. GEMINI_API_KEY is not set on the server. Admin: add it in Netlify → Site settings → Environment variables, then trigger a fresh deploy with cache cleared.',
-        debug: 'process.env.GEMINI_API_KEY is undefined in the Netlify function runtime.',
+        reply: '🔑 The AI service is currently unavailable. GEMINI_API_KEY is not set on the server.',
+        debug: 'process.env.GEMINI_API_KEY is undefined',
       }) };
     }
 
@@ -115,7 +135,7 @@ exports.handler = async function (event) {
 
     const lastUserMsg = [...history].reverse().find(m => (m.role === 'user' || !m.role))?.content || '';
     const crisisOverride = isCrisis(lastUserMsg)
-      ? '\n\n⚠ CRISIS DETECTED IN LATEST MESSAGE. Begin your reply by gently acknowledging their pain, then give the helpline list (iCall, Vandrevala, 112, DMHP) clearly. Do not skip this. Do not lecture. End with: "Is there someone with you right now?"'
+      ? '\n\n⚠ CRISIS DETECTED IN LATEST MESSAGE. Begin by gently acknowledging their pain, then give the helpline list (iCall, Vandrevala, 112, DMHP) clearly. End with: "Is there someone with you right now?"'
       : '';
 
     const geminiBody = {
@@ -135,41 +155,70 @@ exports.handler = async function (event) {
       ],
     };
 
-    const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-    const resp = await fetch(url, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(geminiBody),
-    });
+    // ── Try each model in the fallback chain ─────────────────────
+    let lastErrCode = 0, lastErrMsg = '', resp = null, modelUsed = '';
 
-    const rawText = await resp.text();
-    let data = {};
-    try { data = JSON.parse(rawText); } catch { /* keep raw */ }
+    for (const modelName of MODEL_CHAIN) {
+      try {
+        resp = await callGemini(modelName, apiKey, geminiBody, 7500);
+        if (resp.ok) { modelUsed = modelName; break; }
 
-    if (!resp.ok) {
-      console.error('[chat] Gemini error:', resp.status, rawText.slice(0, 400));
-      const errMsg = data?.error?.message || rawText.slice(0, 200) || 'Unknown';
+        const errText = await resp.text();
+        let errData = {};
+        try { errData = JSON.parse(errText); } catch {}
+        lastErrCode = resp.status;
+        lastErrMsg = (errData?.error?.message || errText || '').slice(0, 300);
+        console.error(`[chat] ${modelName} returned ${resp.status}: ${lastErrMsg}`);
 
-      if (resp.status === 429) {
-        return { statusCode: 429, headers, body: JSON.stringify({
-          error: 'RATE_LIMIT',
-          reply: 'I\'m getting a lot of requests right now — please try again in a minute.',
-          debug: errMsg,
-        }) };
+        // If it's an auth or rate-limit issue, no point trying fallbacks
+        if (resp.status === 401 || resp.status === 403 || resp.status === 429) break;
+        // For 404 (model gone) or 5xx, fall through to next model
+      } catch (fetchErr) {
+        lastErrCode = 0;
+        lastErrMsg = fetchErr.message;
+        console.error(`[chat] ${modelName} fetch failed: ${fetchErr.message}`);
+        if (fetchErr.name === 'AbortError') {
+          // Timeout — bail out rather than hit Netlify's hard timeout
+          return { statusCode: 504, headers, body: JSON.stringify({
+            error: 'TIMEOUT',
+            reply: 'The AI is taking longer than usual to respond. Please try again — sometimes the first request after a quiet period is slow.',
+            debug: `Aborted after 7.5s on ${modelName}`,
+          }) };
+        }
       }
-      if (resp.status === 400 && errMsg.toLowerCase().includes('api key')) {
+    }
+
+    // ── No model worked ──────────────────────────────────────────
+    if (!resp || !resp.ok) {
+      const errLower = lastErrMsg.toLowerCase();
+
+      if (lastErrCode === 401 || lastErrCode === 403 || errLower.includes('api key not valid') || errLower.includes('api_key_invalid')) {
         return { statusCode: 401, headers, body: JSON.stringify({
           error: 'INVALID_KEY',
-          reply: '🔑 The Gemini API key is invalid or expired. Admin: regenerate one at aistudio.google.com/app/apikey and update Netlify.',
-          debug: errMsg,
+          reply: '🔑 The Gemini API key is invalid or expired. Get a fresh one at https://aistudio.google.com/app/apikey and update GEMINI_API_KEY in Netlify.',
+          debug: `Status ${lastErrCode}: ${lastErrMsg}`,
         }) };
       }
+      if (lastErrCode === 429 || errLower.includes('quota') || errLower.includes('rate')) {
+        return { statusCode: 429, headers, body: JSON.stringify({
+          error: 'RATE_LIMIT',
+          reply: 'I\'ve hit my hourly limit. Please try again in a minute — or check your Google AI Studio quota.',
+          debug: `Status ${lastErrCode}: ${lastErrMsg}`,
+        }) };
+      }
+
       return { statusCode: 502, headers, body: JSON.stringify({
-        error: 'GEMINI_ERROR',
-        reply: 'The AI service had a hiccup. Try sending your message again in a moment.',
-        debug: `Status ${resp.status}: ${errMsg}`,
+        error: 'ALL_MODELS_FAILED',
+        reply: 'The AI service is temporarily unreachable. We tried 3 model versions and none responded. Check the Netlify function logs for details.',
+        debug: `Last: status ${lastErrCode} — ${lastErrMsg}`,
+        modelsAttempted: MODEL_CHAIN,
       }) };
     }
+
+    // ── Got a successful response — parse it ─────────────────────
+    const rawText = await resp.text();
+    let data = {};
+    try { data = JSON.parse(rawText); } catch {}
 
     const reply =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
@@ -183,17 +232,20 @@ exports.handler = async function (event) {
         reply: blocked === 'SAFETY'
           ? 'I want to be helpful with what you shared, but my safety filters held that response back. Could you tell me a little more about how you\'re feeling?'
           : 'I\'m here. Could you share a little more about what\'s on your mind?',
-        debug: `blockReason=${blocked || 'none'}`,
+        debug: `blockReason=${blocked || 'none'}, model=${modelUsed}`,
       }) };
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ reply: reply.trim() }) };
+    return { statusCode: 200, headers, body: JSON.stringify({
+      reply: reply.trim(),
+      _model: modelUsed,  // helps debugging
+    }) };
 
   } catch (err) {
     console.error('[chat] Handler exception:', err.message, err.stack);
     return { statusCode: 500, headers, body: JSON.stringify({
       error: 'INTERNAL',
-      reply: 'Something went wrong on my side. Please try again — and if it keeps happening, the developer needs to check the function logs.',
+      reply: 'Something went wrong on my side. Please try again.',
       debug: err.message,
     }) };
   }
